@@ -3,6 +3,7 @@ import { APP_FILTER } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
 import { DomainErrorFilter } from './common/domain-error.js';
 import { EquipmentsModule } from './equipments/equipments.module.js';
+import { HabilitationsModule } from './habilitations/habilitations.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { ReservationsModule } from './reservations/reservations.module.js';
@@ -15,7 +16,7 @@ import { UsersModule } from './users/users.module.js';
  * main.ts : ainsi les tests, qui démarrent AppModule, l'ont aussi.
  */
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, EquipmentsModule, ReservationsModule],
+  imports: [PrismaModule, AuthModule, UsersModule, EquipmentsModule, HabilitationsModule, ReservationsModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: DomainErrorFilter }],
 })
