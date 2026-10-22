@@ -1,34 +1,37 @@
-/** What the token of the API carries: the same fields as `JwtPayload` in the API, plus the dates. */
+import type { Role } from '../types';
+
+/** Ce que porte le token de l'API : les champs de `JwtPayload` côté API, plus les dates. */
 export interface JwtPayload {
-  /** The user id: that is the JWT convention */
+  /** L'id de l'utilisateur : la convention JWT */
   sub: string;
   username: string;
-  role: 'admin' | 'user';
-  /** Issued at, in seconds since 1970 */
+  name: string;
+  role: Role;
+  /** Émis à, en secondes depuis 1970 */
   iat: number;
-  /** Expires at, in seconds since 1970 */
+  /** Expire à, en secondes depuis 1970 */
   exp: number;
 }
 
 /**
- * Given. Reads the payload of a JWT, the part between the two dots, or null
- * when the token cannot be read.
- *
- * The payload is not secret: it is encoded in base64url, not encrypted.
- * Anyone who has the token can read it, here with `atob`, or on jwt.io. What
- * nobody can do is change it: the signature, the third part, would no longer
- * match, and the API would answer 401.
- *
- * So the front reads the payload to show who is logged in, and never trusts
- * it for anything else: the API checks the signature on every request.
+ * Lit le payload d'un JWT (la partie entre les deux points), ou null si on ne
+ * peut pas le lire. Le payload n'est pas secret : il est encodé, pas chiffré.
+ * Le front le lit pour afficher qui est connecté, et ne lui fait confiance
+ * pour rien d'autre : l'API vérifie la signature à chaque requête.
  */
 export function decodePayload(token: string): JwtPayload | null {
   try {
     const payload = token.split('.')[1];
-    // base64url → base64: the URL-safe alphabet has - and _ where base64 has + and /.
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64)) as JwtPayload;
+    // atob donne des octets ; TextDecoder les relit en UTF-8, pour les accents de « Léa ».
+    const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as JwtPayload;
   } catch {
     return null;
   }
+}
+
+/** Un token encore valable : lisible, et pas expiré. */
+export function isValid(payload: JwtPayload | null): payload is JwtPayload {
+  return payload !== null && payload.exp * 1000 > Date.now();
 }

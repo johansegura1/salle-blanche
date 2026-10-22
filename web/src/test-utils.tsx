@@ -5,12 +5,11 @@ import { MemoryRouter } from 'react-router';
 import { vi } from 'vitest';
 import App from './App';
 import { AuthProvider, TOKEN_KEY } from './auth/AuthProvider';
+import type { Role } from './types';
 
 /**
- * Given. The helpers of the tests: read them, don't change them.
- *
- * No browser, no API during the tests. The URL lives in a MemoryRouter
- * instead of the address bar, and `fetch` is replaced by a fake API.
+ * Les outils des tests. Pas de navigateur ni d'API pendant les tests :
+ * l'adresse vit dans un MemoryRouter, et `fetch` est remplacé par une fausse API.
  */
 
 /**
@@ -39,25 +38,38 @@ export function renderWithRouter(ui: ReactElement) {
 }
 
 /**
- * A token as the API makes them: a real header and payload in base64url,
- * valid for an hour. The signature is fake: the front never checks it, only
- * the API can.
+ * Un token comme ceux de l'API : un vrai en-tête et un vrai payload en
+ * base64url, valable une heure. La signature est fausse : le front ne la
+ * vérifie jamais, seule l'API le peut.
  */
-export function makeToken({ username = 'alice', role = 'admin' }: { username?: string; role?: 'admin' | 'user' } = {}): string {
-  const encode = (value: object) =>
-    btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+export function makeToken({
+  username = 'claire',
+  name = 'Claire Martin',
+  role = 'manager',
+  sub = `user-${username}`,
+  expiresIn = 3600,
+}: { username?: string; name?: string; role?: Role; sub?: string; expiresIn?: number } = {}): string {
+  const encode = (value: object) => {
+    // UTF-8 d'abord, pour les accents des noms, puis base64url.
+    const bytes = new TextEncoder().encode(JSON.stringify(value));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
   const now = Math.floor(Date.now() / 1000);
   const header = encode({ alg: 'HS256', typ: 'JWT' });
-  const payload = encode({ sub: 'u1', username, role, iat: now, exp: now + 3600 });
+  const payload = encode({ sub, username, name, role, iat: now, exp: now + expiresIn });
   return `${header}.${payload}.fake-signature`;
 }
+
+/** Les deux profils des tests. */
+export const managerToken = () => makeToken();
+export const userToken = () => makeToken({ username: 'lea', name: 'Léa Dubois', role: 'user' });
 
 /** What the fake API answers to one request. */
 type Handler = (request: Request) => Response | Promise<Response>;
 
 /**
  * Replaces `fetch` by a fake API. `routes` maps a method and a path to an
- * answer: `{ 'GET /models': () => Response.json([...]) }`. The query string
+ * answer: `{ 'GET /equipments': () => Response.json([...]) }`. The query string
  * counts when the route has one. Any other request: 404.
  *
  * Returns the list of the requests made, to check what the app sent.
@@ -85,7 +97,7 @@ export function nestError(status: number, message: string | string[]): Response 
   return Response.json({ statusCode: status, message }, { status });
 }
 
-/** The path and query of a request, without the host: "/models?task=translation". */
+/** Le chemin et la query d'une requête, sans l'hôte : "/equipments?zone=FABRICATION". */
 export function pathOf(request: Request): string {
   const { pathname, search } = new URL(request.url);
   return pathname + search;

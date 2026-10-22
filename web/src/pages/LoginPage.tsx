@@ -8,7 +8,7 @@ interface FromState {
   from?: string;
 }
 
-/** The login page, at /login. A controlled form: React holds the value of each field. */
+/** La page de connexion, sur /login. Un formulaire contrôlé : React tient la valeur de chaque champ. */
 export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -24,11 +24,14 @@ export const LoginPage = () => {
     setError('');
 
     try {
-      await login(username, password);
-      // Back to the page RequireAuth came from, or to the catalogue. replace: the
-      // login page does not stay in the history.
+      const user = await login(username, password);
+      // Retour à la page que RequireAuth a retenue, ou à l'accueil. Sauf une page
+      // de gestionnaire pour quelqu'un qui ne l'est pas : c'était celle de la
+      // personne précédente sur ce poste. replace : la connexion ne reste pas
+      // dans l'historique.
       const from = (location.state as FromState | null)?.from ?? '/';
-      navigate(from, { replace: true });
+      const allowed = !from.startsWith('/admin') || user?.role === 'manager';
+      navigate(allowed ? from : '/', { replace: true });
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 401
@@ -77,7 +80,9 @@ export const LoginPage = () => {
         </button>
       </form>
 
-      <p className="hint">Deux comptes&nbsp;: alice, administratrice, et bob. Le mot de passe&nbsp;: secret.</p>
+      <p className="hint">
+        Comptes de démonstration&nbsp;: claire et bruno (gestionnaires), lea et noah. Mot de passe&nbsp;: secret.
+      </p>
     </section>
   );
 };

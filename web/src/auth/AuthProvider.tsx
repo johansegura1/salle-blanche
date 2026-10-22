@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import * as api from '../api';
-import { decodePayload, type JwtPayload } from './jwt';
+import { decodePayload, isValid, type JwtPayload } from './jwt';
 
 /** Where the token is kept: DevTools → Application → Local Storage, under this key. */
 export const TOKEN_KEY = 'token';
@@ -11,8 +11,8 @@ export interface Auth {
   token: string | null;
   /** Who is logged in, read from the payload of the token. null: logged out. */
   user: JwtPayload | null;
-  /** Asks the API for a token and keeps it. Lets the ApiError through: 401 for a wrong password. */
-  login: (username: string, password: string) => Promise<void>;
+  /** Demande un token à l'API, le garde, et renvoie qui s'est connecté. Laisse passer l'ApiError : 401 pour un mauvais mot de passe. */
+  login: (username: string, password: string) => Promise<JwtPayload | null>;
   /** Forgets the token. */
   logout: () => void;
 }
@@ -35,16 +35,20 @@ interface AuthProviderProps {
  * starts from what localStorage holds.
  */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  const [storedToken, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
-  // Computed at each render from the token, like the total of a list: nothing to keep in step.
-  const user = token ? decodePayload(token) : null;
+  // Calculé à chaque rendu à partir du token. Un token expiré compte comme
+  // une déconnexion : RequireAuth renvoie alors vers la connexion.
+  const payload = storedToken ? decodePayload(storedToken) : null;
+  const user = isValid(payload) ? payload : null;
+  const token = user ? storedToken : null;
 
   const login = async (username: string, password: string) => {
     // A wrong password throws here, before anything is kept: the page shows the error.
     const newToken = await api.login(username, password);
     localStorage.setItem(TOKEN_KEY, newToken);
     setToken(newToken);
+    return decodePayload(newToken);
   };
 
   const logout = () => {

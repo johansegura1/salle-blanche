@@ -1,12 +1,21 @@
-import type { Model, NewModel, Task } from './model';
+import type {
+  Equipment,
+  EquipmentDetail,
+  Habilitation,
+  Maintenance,
+  NewReservation,
+  PublicUser,
+  Reservation,
+  Zone,
+} from './types';
 
-/** Where the API runs, read from `.env`. The fallback is the port of `npm run start:dev`. */
+/** Où tourne l'API, lu dans `.env` (ou passé au build par Docker). */
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 /**
- * Given. An answer of the API that is not ok: a 4xx or a 5xx. `status` says
- * which one, and the pages decide what to show from it. `details` holds what
- * the API explained, one sentence per invalid field for a 400.
+ * Une réponse de l'API qui n'est pas ok : un 4xx ou un 5xx. `status` dit
+ * lequel, `details` contient ce que l'API a expliqué (une phrase par champ
+ * pour un 400, le message métier sinon : « Ce créneau est déjà réservé. »).
  */
 export class ApiError extends Error {
   readonly status: number;
@@ -20,43 +29,40 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * Given. Does nothing when the answer is ok, throws an ApiError otherwise.
- *
- * NestJS explains its errors in the body, `{ statusCode, message, error }`:
- * `message` is a sentence, or a list of sentences for a 400.
- */
+/** Ne fait rien si la réponse est ok, lève une ApiError sinon. */
 export async function throwIfNotOk(res: Response): Promise<void> {
   if (res.ok) return;
 
   const body: unknown = await res.json().catch(() => undefined);
   const message = body && typeof body === 'object' && 'message' in body ? body.message : undefined;
   const details = Array.isArray(message) ? message.map(String) : typeof message === 'string' ? [message] : [];
-  throw new ApiError(res.status, `L'API a répondu ${res.status}`, details);
+  throw new ApiError(res.status, details[0] ?? `L'API a répondu ${res.status}`, details);
 }
 
-/** Given, from TP7. GET /models, filtered on the server when a task is given. */
-export async function fetchModels(task?: Task): Promise<Model[]> {
-  const url = task ? `${API_URL}/models?task=${task}` : `${API_URL}/models`;
-  const res = await fetch(url);
-  await throwIfNotOk(res);
-  // A promise made to the compiler, not a check: the API is trusted to send models.
-  return (await res.json()) as Model[];
-}
-
-/** Given, from TP8. GET /models/:id. An unknown id: an ApiError whose `status` is 404. */
-export async function fetchModel(id: string): Promise<Model> {
-  const res = await fetch(`${API_URL}/models/${id}`);
-  await throwIfNotOk(res);
-  return (await res.json()) as Model;
+/** La phrase à montrer à l'utilisateur pour une erreur : le message de l'API quand il y en a un. */
+export function errorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.details.length > 0) return error.details.join(' ');
+  return error instanceof Error ? error.message : String(error);
 }
 
 /**
- * POST /auth/login, and the `access_token` of the answer. A wrong password: 401.
- *
- * A JSON body needs its header, `'Content-Type': 'application/json'`:
- * without it, NestJS does not read the body.
+ * Une requête avec le token. Toutes les routes, sauf /auth/login et /health,
+ * demandent d'être connecté. Un 204 n'a pas de corps : on renvoie undefined.
  */
+async function call<T>(path: string, token: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: init.method ?? 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+  });
+  await throwIfNotOk(res);
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
+}
+
+/** POST /auth/login : le token, ou une ApiError 401 pour un mauvais mot de passe. */
 export async function login(username: string, password: string): Promise<string> {
   const res = await fetch(`${API_URL}/auth/login`, {
     method: 'POST',
@@ -64,24 +70,47 @@ export async function login(username: string, password: string): Promise<string>
     body: JSON.stringify({ username, password }),
   });
   await throwIfNotOk(res);
-  const body = (await res.json()) as { access_token: string };
-  return body.access_token;
+  return ((await res.json()) as { access_token: string }).access_token;
 }
 
-/**
- * POST /models, with the token. Returns the model the API created. The
- * errors: 400 invalid body, 401 no valid token, 409 id already taken,
- * 422 unknown organisation.
- */
-export async function createModel(model: NewModel, token: string): Promise<Model> {
-  const res = await fetch(`${API_URL}/models`, {
+export const fetchEquipments = (token: string, zone?: Zone) =>
+  call<Equipment[]>(zone ? `/equipments?zone=${zone}` : '/equipments', token);
+
+export const fetchEquipment = (id: string, token: string) => call<EquipmentDetail>(`/equipments/${id}`, token);
+
+export const fetchPlanning = (equipmentId: string, from: Date, to: Date, token: string) => {
+  const query = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
+  return call<Reservation[]>(`/equipments/${equipmentId}/reservations?${query}`, token);
+};
+
+export const fetchMyReservations = (token: string) => call<Reservation[]>('/reservations/mine', token);
+
+export const createReservation = (reservation: NewReservation, token: string) =>
+  call<Reservation>('/reservations', token, { method: 'POST', body: reservation });
+
+export const cancelReservation = (id: string, token: string) =>
+  call<Reservation>(`/reservations/${id}`, token, { method: 'DELETE' });
+
+export const createMaintenance = (
+  equipmentId: string,
+  maintenance: { start: string; end: string; reason: string },
+  token: string,
+) =>
+  call<{ maintenance: Maintenance; cancelledReservations: number }>(`/equipments/${equipmentId}/maintenances`, token, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(model),
+    body: maintenance,
   });
-  await throwIfNotOk(res);
-  return (await res.json()) as Model;
-}
+
+export const deleteMaintenance = (id: string, token: string) =>
+  call<void>(`/maintenances/${id}`, token, { method: 'DELETE' });
+
+export const fetchUsers = (token: string) => call<PublicUser[]>('/users', token);
+
+export const fetchHabilitations = (userId: string, token: string) =>
+  call<Habilitation[]>(`/habilitations?userId=${encodeURIComponent(userId)}`, token);
+
+export const grantHabilitation = (userId: string, equipmentId: string, token: string) =>
+  call<Habilitation>('/habilitations', token, { method: 'POST', body: { userId, equipmentId } });
+
+export const revokeHabilitation = (id: string, token: string) =>
+  call<void>(`/habilitations/${id}`, token, { method: 'DELETE' });
