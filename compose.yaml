@@ -1,0 +1,41 @@
+# Toute l'application en une commande : docker compose up --build
+services:
+  migrate:
+    build:
+      context: ./api
+      target: build
+    environment:
+      DATABASE_URL: file:/app/db/salle-blanche.db
+      TZ: Europe/Paris
+    volumes:
+      - data:/app/db
+    command: sh -c "npx prisma migrate deploy && npm run db:seed"
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: file:/app/db/salle-blanche.db
+      JWT_SECRET: dev-secret-change-me-in-production
+      PORT: "3000"
+      WEB_ORIGIN: http://localhost:8080
+      TZ: Europe/Paris
+    ports:
+      - "3000:3000"
+    volumes:
+      - data:/app/db
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  data:
