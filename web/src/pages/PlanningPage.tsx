@@ -11,6 +11,7 @@ import {
   formatTime,
   fromDateInput,
   hhmm,
+  nextSlot,
   SLOT_STARTS,
   startOfWeek,
   toDateInput,
@@ -182,9 +183,11 @@ interface ReservationFormProps {
 const ReservationForm = ({ equipment, picked }: ReservationFormProps) => {
   const { token, user, logout } = useAuth();
   const queryClient = useQueryClient();
-  const [day, setDay] = useState(toDateInput(picked?.day ?? new Date()));
-  const [start, setStart] = useState(picked?.minutes ?? 8 * 60);
-  const [end, setEnd] = useState((picked?.minutes ?? 8 * 60) + 60);
+  // Sans case cliquée, on propose le prochain créneau possible, pas une heure déjà passée.
+  const initial = picked ?? nextSlot(new Date());
+  const [day, setDay] = useState(toDateInput(initial.day));
+  const [start, setStart] = useState(initial.minutes);
+  const [end, setEnd] = useState(Math.min(initial.minutes + 60, 20 * 60));
   const [note, setNote] = useState('');
 
   const reserve = useMutation({

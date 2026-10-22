@@ -26,7 +26,7 @@ export const MyReservationsPage = () => {
   });
 
   const now = new Date();
-    // L'API trie du plus récent au plus ancien : bien pour « Passées ».
+  // L'API trie du plus récent au plus ancien : bien pour « Passées ».
   // « À venir » se lit dans l'autre sens, la prochaine réservation en premier.
   const upcoming = data?.filter((r) => new Date(r.end) > now).reverse() ?? [];
   const past = data?.filter((r) => new Date(r.end) <= now) ?? [];

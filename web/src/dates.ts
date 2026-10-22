@@ -52,3 +52,23 @@ export function formatShortDay(date: Date): string {
 export function formatTime(date: Date | string): string {
   return new Date(date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
+
+/**
+ * Le prochain créneau qu'on peut encore réserver, à partir de `now` : la
+ * prochaine demi-heure, un jour de semaine, entre 7 h et 19 h 30. Sert de
+ * valeur par défaut au formulaire, pour ne pas proposer une heure passée.
+ */
+export function nextSlot(now: Date): { day: Date; minutes: number } {
+  let day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let minutes = Math.ceil((now.getHours() * 60 + now.getMinutes()) / 30) * 30;
+  if (minutes < SLOT_STARTS[0]) minutes = SLOT_STARTS[0];
+  if (minutes > SLOT_STARTS[SLOT_STARTS.length - 1]) {
+    day = addDays(day, 1);
+    minutes = SLOT_STARTS[0];
+  }
+  while (day.getDay() === 0 || day.getDay() === 6) {
+    day = addDays(day, 1);
+    minutes = SLOT_STARTS[0];
+  }
+  return { day, minutes };
+}
