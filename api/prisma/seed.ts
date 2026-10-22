@@ -47,19 +47,31 @@ function nextWorkingDay(daysAhead: number): string {
   }
 }
 
+/*
+ * Les comptes et les équipements du seed ont des id fixes ("user-lea",
+ * "eq-SB-010") plutôt que des uuid tirés au hasard. Sinon, après un
+ * `docker compose down -v`, le navigateur garde un token valide qui pointe
+ * vers l'ancien id de Léa : elle se retrouve « non habilitée » partout et ses
+ * réservations échouent. Avec des id fixes, un token reste juste d'une base à
+ * l'autre, et les adresses du planning (/equipments/eq-SB-010) aussi.
+ */
 async function main(): Promise<void> {
   const users = await readJson<UserSeed[]>('data/users.json');
   for (const { password, ...user } of users) {
     await prisma.user.upsert({
       where: { username: user.username },
-      create: { ...user, passwordHash: hashPassword(password) },
+      create: { id: `user-${user.username}`, ...user, passwordHash: hashPassword(password) },
       update: {},
     });
   }
 
   const equipments = await readJson<EquipmentSeed[]>('data/equipments.json');
   for (const equipment of equipments) {
-    await prisma.equipment.upsert({ where: { code: equipment.code }, create: equipment, update: {} });
+    await prisma.equipment.upsert({
+      where: { code: equipment.code },
+      create: { id: `eq-${equipment.code}`, ...equipment },
+      update: {},
+    });
   }
 
   const habilitations = await readJson<HabilitationSeed[]>('data/habilitations.json');
