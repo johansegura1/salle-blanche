@@ -1,36 +1,21 @@
 import 'dotenv/config';
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module.js';
+import { configureApp } from './app.setup.js';
 
-/**
- * TP2 solution: the entry point.
- *
- * `whitelist` strips fields not declared in the DTO; `forbidNonWhitelisted`
- * goes further and rejects the request outright, so a client cannot sneak
- * an unexpected property into the body.
- */
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  configureApp(app);
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  // The browser lets a page read the answers of this API only if its origin
-  // is listed here. One explicit origin, never '*'.
+  // Le navigateur ne laisse une page lire les réponses de l'API que si son
+  // origine est listée ici. Une origine explicite, jamais '*'.
   app.enableCors({ origin: process.env.WEB_ORIGIN ?? 'http://localhost:5173' });
 
-  // Swagger UI on /docs, the OpenAPI document on /docs-json.
-  // `persistAuthorization` keeps the token pasted in "Authorize" across reloads.
+  // Swagger sur /docs : « Authorize » avec le token de POST /auth/login.
   const config = new DocumentBuilder()
-    .setTitle('Model catalogue API')
-    .setDescription('Get a token with POST /auth/login, then paste it in "Authorize".')
+    .setTitle('Salle blanche : API de réservation')
+    .setDescription('Obtenez un token avec POST /auth/login, puis collez-le dans « Authorize ».')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

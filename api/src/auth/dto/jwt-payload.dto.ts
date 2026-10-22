@@ -1,15 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { Role } from '../../users.js';
+import type { Role } from '../../users/user.js';
 import type { JwtPayload } from '../auth.guard.js';
 
-/** What the token carries, the way `GET /auth/whoami` answers it. */
+/** Ce que porte le token, tel que GET /auth/whoami le renvoie. */
 export class JwtPayloadDto implements JwtPayload {
-  @ApiProperty({ description: 'User id', example: 'u1' })
+  @ApiProperty({ description: 'User id' })
   sub!: string;
 
-  @ApiProperty({ example: 'alice' })
+  @ApiProperty({ example: 'claire' })
   username!: string;
 
-  @ApiProperty({ enum: ['admin', 'user'], example: 'admin' })
+  @ApiProperty({ example: 'Claire Martin' })
+  name!: string;
+
+  @ApiProperty({ enum: ['manager', 'user'], example: 'manager' })
   role!: Role;
 }

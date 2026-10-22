@@ -1,12 +1,6 @@
 [
-  {
-    "username": "alice",
-    "password": "secret",
-    "role": "admin"
-  },
-  {
-    "username": "bob",
-    "password": "secret",
-    "role": "user"
-  }
+  { "username": "claire", "name": "Claire Martin", "role": "manager", "password": "secret" },
+  { "username": "bruno", "name": "Bruno Lefèvre", "role": "manager", "password": "secret" },
+  { "username": "lea", "name": "Léa Dubois", "role": "user", "password": "secret" },
+  { "username": "noah", "name": "Noah Bernard", "role": "user", "password": "secret" }
 ]

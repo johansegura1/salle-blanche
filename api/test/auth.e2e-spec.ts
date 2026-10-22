@@ -1,58 +1,56 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
-import { AppModule } from '../src/app.module.js';
+import { createTestApp, login, resetDb } from './helpers.js';
 
-/**
- * The tests of the login and of the protected route: card 8, then step 5 of
- * the README. The application is started for you; the four tests are yours.
- */
-describe('/auth API', () => {
+describe('/auth et /users', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
-    const moduleRef: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
+    app = await createTestApp();
+    await resetDb(app);
+  });
+  afterAll(() => app.close());
 
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
-    await app.init();
+  it('GET /health répond 200 sans token', async () => {
+    const response = await request(app.getHttpServer()).get('/health').expect(200);
+    expect(response.body.status).toBe('ok');
   });
 
-  afterAll(async () => {
-    await app.close();
-  });
-
-  it('POST /auth/login returns a token for alice / secret', async () => {
+  it('POST /auth/login renvoie un token pour claire / secret', async () => {
     const response = await request(app.getHttpServer())
       .post('/auth/login')
-      .send({ username: 'alice', password: 'secret' })
+      .send({ username: 'claire', password: 'secret' })
       .expect(200);
-    expect(typeof response.body.access_token).toBe('string');
     expect(response.body.access_token.split('.')).toHaveLength(3);
   });
 
-  it('POST /auth/login answers 401 for a wrong password', async () => {
-    await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ username: 'alice', password: 'nope' })
-      .expect(401);
+  it('POST /auth/login répond 401 à un mauvais mot de passe, et à un compte inconnu', async () => {
+    await request(app.getHttpServer()).post('/auth/login').send({ username: 'claire', password: 'nope' }).expect(401);
+    await request(app.getHttpServer()).post('/auth/login').send({ username: 'personne', password: 'secret' }).expect(401);
   });
 
-  it('GET /auth/whoami answers 401 without a token', async () => {
+  it('GET /auth/whoami répond 401 sans token, et avec un token falsifié', async () => {
     await request(app.getHttpServer()).get('/auth/whoami').expect(401);
+    await request(app.getHttpServer()).get('/auth/whoami').set('Authorization', 'Bearer abc.def.ghi').expect(401);
   });
 
-  it('GET /auth/whoami returns the payload with a token', async () => {
-    const login = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ username: 'bob', password: 'secret' })
-      .expect(200);
+  it('GET /auth/whoami renvoie le nom et le rôle', async () => {
+    const token = await login(app, 'lea');
     const response = await request(app.getHttpServer())
       .get('/auth/whoami')
-      .set('Authorization', `Bearer ${login.body.access_token}`)
+      .set('Authorization', `Bearer ${token}`)
       .expect(200);
-    expect(response.body).toMatchObject({ username: 'bob', role: 'user' });
+    expect(response.body).toMatchObject({ username: 'lea', name: 'Léa Dubois', role: 'user' });
+  });
+
+  it('GET /users est réservé aux gestionnaires, et ne renvoie jamais de hash de mot de passe', async () => {
+    const [lea, claire] = [await login(app, 'lea'), await login(app, 'claire')];
+    await request(app.getHttpServer()).get('/users').set('Authorization', `Bearer ${lea}`).expect(403);
+    const response = await request(app.getHttpServer())
+      .get('/users')
+      .set('Authorization', `Bearer ${claire}`)
+      .expect(200);
+    expect(response.body).toHaveLength(3);
+    expect(JSON.stringify(response.body)).not.toContain('passwordHash');
   });
 });

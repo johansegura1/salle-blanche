@@ -1,0 +1,16 @@
+[
+  { "code": "SB-001", "name": "Paillasse de nettoyage chimique", "zone": "PREPARATION" },
+  { "code": "SB-002", "name": "Bain à ultrasons", "zone": "PREPARATION" },
+  { "code": "SB-003", "name": "Plaque chauffante", "zone": "PREPARATION" },
+  { "code": "SB-004", "name": "Étuve de séchage", "zone": "PREPARATION" },
+  { "code": "SB-010", "name": "Four de recuit", "zone": "FABRICATION" },
+  { "code": "SB-011", "name": "Bâti de pulvérisation", "zone": "FABRICATION" },
+  { "code": "SB-012", "name": "Évaporateur par faisceau d'électrons", "zone": "FABRICATION" },
+  { "code": "SB-013", "name": "Gravure ionique réactive (RIE)", "zone": "FABRICATION" },
+  { "code": "SB-014", "name": "Dépôt chimique en phase vapeur (PECVD)", "zone": "FABRICATION" },
+  { "code": "SB-015", "name": "Profilomètre", "zone": "FABRICATION" },
+  { "code": "SB-020", "name": "Aligneur de masques UV", "zone": "LITHOGRAPHIE" },
+  { "code": "SB-021", "name": "Tournette d'enduction", "zone": "LITHOGRAPHIE" },
+  { "code": "SB-022", "name": "Écriture laser directe", "zone": "LITHOGRAPHIE" },
+  { "code": "SB-023", "name": "Microscope optique d'inspection", "zone": "LITHOGRAPHIE" }
+]

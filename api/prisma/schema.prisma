@@ -9,37 +9,76 @@ generator client {
   importFileExtension = "js"
 }
 
-// TP3 solution, final state (after step 5). Before that step the schema is
-// flat: `org String` on Model, no Organisation table.
+// La salle blanche. SQLite n'a pas d'union de chaînes : `role`, `zone` et
+// `status` sont des chaînes, restreintes dans le code (user.ts, equipment.ts,
+// reservation.ts).
 
-model Organisation {
-  id      String  @id @default(uuid())
-  slug    String  @unique
-  name    String
-  country String?
+model User {
+  id           String @id @default(uuid())
+  username     String @unique
+  name         String
+  role         String // 'manager' | 'user'
+  passwordHash String
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  models  Model[]
+  habilitations Habilitation[]
+  reservations  Reservation[]
 }
 
-model Model {
-  id         String  @id
-  name       String
-  task       String  // no unions in SQLite: any string, narrowed in the service
-  parameters Float
-  downloads  Int     @default(0)
-  license    String?
-  createdBy  String?
-  deletedAt  DateTime?
+model Equipment {
+  id   String @id @default(uuid())
+  code String @unique // "SB-042"
+  name String
+  zone String // 'PREPARATION' | 'FABRICATION' | 'LITHOGRAPHIE'
 
-  org        Organisation @relation(fields: [orgId], references: [id])
-  orgId      String
+  habilitations Habilitation[]
+  reservations  Reservation[]
+  maintenances  Maintenance[]
+}
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+// Une personne formée sur un équipement : la seule condition pour le réserver.
+model Habilitation {
+  id          String    @id @default(uuid())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId String
+  grantedBy   String // le nom d'utilisateur du gestionnaire
+  grantedAt   DateTime  @default(now())
 
-  @@index([orgId])
-  @@index([task])
+  @@unique([userId, equipmentId])
+}
+
+// Une réservation n'est jamais supprimée : elle passe à CANCELLED, avec la
+// raison, pour que son auteur voie qu'elle a été annulée et pourquoi.
+model Reservation {
+  id           String    @id @default(uuid())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  equipment    Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId  String
+  start        DateTime
+  end          DateTime
+  status       String    @default("ACTIVE") // 'ACTIVE' | 'CANCELLED'
+  note         String? // ex. « Pour l'entreprise X », quand un gestionnaire réserve
+  cancelReason String?
+  createdAt    DateTime  @default(now())
+
+  @@index([equipmentId, start])
+  @@index([userId])
+}
+
+// Une période pendant laquelle l'équipement ne peut pas être réservé.
+model Maintenance {
+  id          String    @id @default(uuid())
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId String
+  start       DateTime
+  end         DateTime
+  reason      String
+  createdBy   String
+  createdAt   DateTime  @default(now())
+
+  @@index([equipmentId, start])
 }

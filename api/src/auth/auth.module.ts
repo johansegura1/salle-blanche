@@ -1,21 +1,22 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
 import { AuthGuard } from './auth.guard.js';
+import { RolesGuard } from './roles.guard.js';
 
 const secret = process.env.JWT_SECRET;
 if (!secret) throw new Error('JWT_SECRET is not set: cp .env.example .env');
 
 /**
- * Given. Signs and verifies tokens with the secret from `.env`.
- *
- * `global: true` makes JwtService injectable everywhere, so `AuthGuard` works
- * in any module without importing anything.
+ * Signe et vérifie les tokens avec le secret du `.env`.
+ * `global: true` rend JwtService injectable partout : AuthGuard marche dans
+ * tous les modules. Un token vit 8 h : une journée de salle blanche.
  */
 @Module({
-  imports: [JwtModule.register({ global: true, secret, signOptions: { expiresIn: '1h' } })],
+  imports: [UsersModule, JwtModule.register({ global: true, secret, signOptions: { expiresIn: '8h' } })],
   controllers: [AuthController],
-  providers: [AuthGuard],
-  exports: [AuthGuard],
+  providers: [AuthGuard, RolesGuard],
+  exports: [AuthGuard, RolesGuard],
 })
 export class AuthModule {}
