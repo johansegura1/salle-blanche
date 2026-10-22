@@ -72,6 +72,16 @@ describe('Réservations', () => {
     await reserve(lea, { equipmentId: 'inconnu', ...slot(day, [8, 0], [9, 0]) }).expect(404);
   });
 
+  it('refuse un équipement en maintenance sur le créneau (409)', async () => {
+    await request(app.getHttpServer())
+      .post(`/equipments/${f.four}/maintenances`)
+      .set('Authorization', `Bearer ${claire}`)
+      .send({ ...slot(day, [7, 0], [20, 0]), reason: 'Pompe à vide' })
+      .expect(201);
+    const response = await reserve(lea, { equipmentId: f.four, ...slot(day, [8, 0], [9, 0]) }).expect(409);
+    expect(response.body.message).toContain('maintenance');
+  });
+
   it('montre le planning de la semaine à tout utilisateur connecté', async () => {
     await reserve(lea, { equipmentId: f.four, ...slot(day, [8, 0], [10, 0]) }).expect(201);
     const { start: from } = slot(day, [0, 0], [1, 0]);
