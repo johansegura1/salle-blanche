@@ -613,3 +613,38 @@ h3 {
 .narrow {
   max-width: 360px;
 }
+
+/* Une réservation ouverte depuis la grille : la libérer, ou l'annuler (gestionnaire). */
+.slot-open {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.slot-open:hover,
+.slot-open:focus-visible {
+  text-decoration: underline;
+}
+
+.panel {
+  margin-top: 16px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.panel .actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.button-danger {
+  background: var(--danger);
+}

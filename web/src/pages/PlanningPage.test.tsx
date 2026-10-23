@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { bobReservation, fourDetail } from '../fixtures.test-data';
 import { fakeApi, managerToken, nestError, renderApp, userToken } from '../test-utils';
 
@@ -77,5 +77,26 @@ describe('PlanningPage', () => {
     fakeApi({ 'GET /equipments/inconnu': () => nestError(404, 'Équipement introuvable.') });
     renderApp('/equipments/inconnu', { token: userToken() });
     expect(await screen.findByRole('alert')).toHaveTextContent('Équipement introuvable.');
+  });
+
+  it('un gestionnaire annule la réservation de quelqu’un d’autre depuis la grille', async () => {
+    const requests = planningRoutes({ 'DELETE /reservations/res-1': () => new Response(null, { status: 204 }) });
+    renderApp('/equipments/eq-four', { token: managerToken() });
+
+    const [first] = await screen.findAllByRole('button', { name: /Voir la réservation de Bob Petit/ });
+    await userEvent.click(first);
+    const panel = screen.getByRole('region', { name: 'Réservation sélectionnée' });
+    expect(panel).toHaveTextContent('Réservation de Bob Petit');
+    await userEvent.click(within(panel).getByRole('button', { name: 'Annuler cette réservation' }));
+
+    await vi.waitFor(() => expect(requests.some((r) => r.method === 'DELETE')).toBe(true));
+  });
+
+  it('un utilisateur ne peut pas ouvrir la réservation d’un autre', async () => {
+    planningRoutes();
+    renderApp('/equipments/eq-four', { token: userToken() });
+
+    expect(await screen.findAllByText('Bob Petit')).toHaveLength(4);
+    expect(screen.queryByRole('button', { name: /Voir la réservation/ })).not.toBeInTheDocument();
   });
 });

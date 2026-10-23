@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type SubmitEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { ApiError, createMaintenance, createReservation, deleteMaintenance, errorMessage, fetchEquipment, fetchPlanning } from '../api';
+import { ApiError, cancelReservation, createMaintenance, createReservation, deleteMaintenance, errorMessage, fetchEquipment, fetchPlanning } from '../api';
 import { useAuth } from '../auth/AuthProvider';
 import {
   addDays,
@@ -29,6 +29,8 @@ export const PlanningPage = () => {
   const [monday, setMonday] = useState(() => startOfWeek(new Date()));
   // Cliquer sur une case libre préremplit le formulaire.
   const [picked, setPicked] = useState<{ day: Date; minutes: number } | null>(null);
+  // Cliquer sur une réservation (la sienne, ou n'importe laquelle pour un gestionnaire) l'ouvre en dessous.
+  const [selected, setSelected] = useState<Reservation | null>(null);
 
   const equipment = useQuery({ queryKey: ['equipment', id], queryFn: () => fetchEquipment(id, token!) });
   const planning = useQuery({
@@ -85,7 +87,11 @@ export const PlanningPage = () => {
         maintenances={eq.maintenances}
         myId={user?.sub}
         onPick={canBook ? (day, minutes) => setPicked({ day, minutes }) : undefined}
+        canOpen={(r) => r.user.id === user?.sub || user?.role === 'manager'}
+        onOpen={setSelected}
       />
+
+      {selected && <SelectedReservation reservation={selected} onClose={() => setSelected(null)} />}
 
       {canBook ? (
         <ReservationForm key={picked ? `${picked.day.toISOString()}-${picked.minutes}` : 'empty'} equipment={eq} picked={picked} />
@@ -106,10 +112,12 @@ interface WeekGridProps {
   maintenances: Maintenance[];
   myId?: string;
   onPick?: (day: Date, minutes: number) => void;
+  canOpen?: (reservation: Reservation) => boolean;
+  onOpen?: (reservation: Reservation) => void;
 }
 
 /** La grille : 5 jours × 26 créneaux de 30 minutes, de 7 h à 20 h. */
-const WeekGrid = ({ monday, reservations, maintenances, myId, onPick }: WeekGridProps) => {
+const WeekGrid = ({ monday, reservations, maintenances, myId, onPick, canOpen, onOpen }: WeekGridProps) => {
   const days = [0, 1, 2, 3, 4].map((i) => addDays(monday, i));
   const now = new Date();
 
@@ -147,9 +155,21 @@ const WeekGrid = ({ monday, reservations, maintenances, myId, onPick }: WeekGrid
                 }
                 if (reservation) {
                   const mine = reservation.user.id === myId;
+                  const label = mine ? 'Moi' : reservation.user.name;
                   return (
                     <td key={day.toISOString()} className={mine ? 'slot slot-mine' : 'slot slot-taken'} title={reservation.note}>
-                      {mine ? 'Moi' : reservation.user.name}
+                      {onOpen && canOpen?.(reservation) ? (
+                        <button
+                          className="slot-open"
+                          type="button"
+                          aria-label={`Voir la réservation de ${reservation.user.name}, ${formatShortDay(day)} à ${hhmm(minutes)}`}
+                          onClick={() => onOpen(reservation)}
+                        >
+                          {label}
+                        </button>
+                      ) : (
+                        label
+                      )}
                     </td>
                   );
                 }
@@ -178,6 +198,54 @@ interface ReservationFormProps {
   equipment: EquipmentDetail;
   picked: { day: Date; minutes: number } | null;
 }
+
+interface SelectedReservationProps {
+  reservation: Reservation;
+  onClose: () => void;
+}
+
+/**
+ * Une réservation ouverte depuis la grille. Son auteur la libère ; un
+ * gestionnaire peut annuler celle de n'importe qui, par exemple un créneau où
+ * personne n'est venu (Claire : « tout voir et pouvoir tout modifier »).
+ * L'API refait la vérification : elle seule décide qui peut annuler quoi.
+ */
+const SelectedReservation = ({ reservation, onClose }: SelectedReservationProps) => {
+  const { token, user } = useAuth();
+  const queryClient = useQueryClient();
+  const mine = reservation.user.id === user?.sub;
+
+  const cancel = useMutation({
+    mutationFn: () => cancelReservation(reservation.id, token!),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries();
+      onClose();
+    },
+  });
+
+  return (
+    <section className="panel" aria-label="Réservation sélectionnée">
+      <p>
+        <strong>{mine ? 'Ma réservation' : `Réservation de ${reservation.user.name}`}</strong> :{' '}
+        {formatDay(reservation.start)}, {formatTime(reservation.start)} – {formatTime(reservation.end)}
+        {reservation.note && <> · {reservation.note}</>}
+      </p>
+      <div className="actions">
+        <button className="button button-danger" type="button" disabled={cancel.isPending} onClick={() => cancel.mutate()}>
+          {mine ? 'Libérer le créneau' : 'Annuler cette réservation'}
+        </button>
+        <button className="link-button" type="button" onClick={onClose}>
+          Fermer
+        </button>
+      </div>
+      {cancel.isError && (
+        <p className="error" role="alert">
+          {errorMessage(cancel.error)}
+        </p>
+      )}
+    </section>
+  );
+};
 
 /** Réserver : un jour, une heure de début, une heure de fin. L'API vérifie toutes les règles. */
 const ReservationForm = ({ equipment, picked }: ReservationFormProps) => {

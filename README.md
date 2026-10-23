@@ -4,7 +4,7 @@ Projet Développement Web, ISMIN 3A. Johan Segura et Souhaib Hajjaj.
 
 Claire gère la salle blanche du Centre de microélectronique : une centaine d'équipements, réservés jusqu'ici sur un tableur que tout le monde pouvait modifier. Cette application le remplace :
 
-1. **Réserver un équipement** : le planning de la semaine, en créneaux de 30 minutes, du lundi au vendredi de 7 h à 20 h, au plus deux semaines à l'avance. Pas de chevauchement : le premier qui réserve a le créneau. Chacun libère ses propres créneaux.
+1. **Réserver un équipement** : le planning de la semaine, en créneaux de 30 minutes, du lundi au vendredi de 7 h à 20 h, au plus deux semaines à l'avance. Pas de chevauchement : le premier qui réserve a le créneau. Chacun libère ses propres créneaux, depuis le planning ou « Mes réservations » ; un gestionnaire peut annuler n'importe quelle réservation.
 2. **Gérer les habilitations** : seule une personne formée sur un équipement peut le réserver. Les gestionnaires accordent et retirent les habilitations.
 3. **Les équipements et leur maintenance** : la liste par zone, avec leur statut. Un gestionnaire met un équipement en maintenance : il n'est plus réservable, et les réservations de la période passent à « annulée », visibles par leurs auteurs.
 
@@ -37,7 +37,7 @@ Les données survivent à `docker compose down`. Pour repartir d'une base neuve 
 
 ```sh
 cd api && npm ci && npm test     # 50 tests : règles des créneaux, réservations, habilitations, maintenance, rôles
-cd web && npm ci && npm test     # 27 tests : pages, connexion, erreurs de l'API
+cd web && npm ci && npm test     # 30 tests : pages, connexion, erreurs de l'API
 ```
 
 Les tests de l'API créent leur propre base, `test.db` : ils ne touchent jamais à `dev.db`.
